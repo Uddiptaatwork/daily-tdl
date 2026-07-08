@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daily Tasks</title>
+    <style>
+        /* --- Minimalist CSS --- */
+        :root {
+            --bg-color: #f7f7f7;
+            --card-bg: #ffffff;
+            --text-main: #333333;
+            --text-muted: #888888;
+            --border-color: #e0e0e0;
+            --accent: #1a1a1a;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            justify-content: center;
+            padding-top: 10vh;
+            margin: 0;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+
+        .container {
+            background: var(--card-bg);
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+            width: 100%;
+            max-width: 450px;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            margin-top: 0;
+            margin-bottom: 1.5rem;
+            font-weight: 600;
+        }
+
+        form {
+            display: flex;
+            margin-bottom: 1.5rem;
+        }
+
+        input[type="text"] {
+            flex-grow: 1;
+            padding: 0.75rem 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 6px 0 0 6px;
+            outline: none;
+            font-size: 1rem;
+            transition: border-color 0.2s ease;
+        }
+
+        input[type="text"]:focus {
+            border-color: var(--accent);
+        }
+
+        button.add-btn {
+            padding: 0.75rem 1.25rem;
+            border: none;
+            background: var(--accent);
+            color: white;
+            cursor: pointer;
+            border-radius: 0 6px 6px 0;
+            font-size: 1rem;
+            font-weight: 500;
+            transition: background 0.2s ease;
+        }
+
+        button.add-btn:hover {
+            background: #444;
+        }
+
+        ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        li {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid var(--border-color);
+            animation: fadeIn 0.3s ease;
+        }
+
+        li:last-child {
+            border-bottom: none;
+        }
+
+        .task-content {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            width: 100%;
+            user-select: none;
+        }
+
+        .task-content input[type="checkbox"] {
+            margin-right: 12px;
+            cursor: pointer;
+            width: 18px;
+            height: 18px;
+            accent-color: var(--accent);
+        }
+
+        .task-text {
+            font-size: 1rem;
+            transition: color 0.2s ease;
+        }
+
+        .completed .task-text {
+            text-decoration: line-through;
+            color: var(--text-muted);
+        }
+
+        .delete-btn {
+            background: none;
+            color: var(--text-muted);
+            border: none;
+            cursor: pointer;
+            font-size: 1.2rem;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+        }
+
+        .delete-btn:hover {
+            color: #ff4d4d;
+            background: #ffe6e6;
+        }
+
+        .footer-actions {
+            margin-top: 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+        }
+
+        .action-link {
+            color: var(--text-muted);
+            cursor: pointer;
+            text-decoration: underline;
+            background: none;
+            border: none;
+            padding: 0;
+        }
+        
+        .action-link:hover {
+            color: var(--text-main);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Daily Wiki</h1>
+        
+        <form id="todo-form">
+            <input type="text" id="todo-input" placeholder="What needs doing?" autocomplete="off" required>
+            <button type="submit" class="add-btn">Add</button>
+        </form>
+
+        <ul id="todo-list"></ul>
+
+        <div class="footer-actions">
+            <button class="action-link" id="uncheck-all">Uncheck All (New Day)</button>
+            <button class="action-link" id="clear-completed">Clear Completed</button>
+        </div>
+    </div>
+
+    <script>
+        // --- JavaScript Logic ---
+        const form = document.getElementById('todo-form');
+        const input = document.getElementById('todo-input');
+        const list = document.getElementById('todo-list');
+        const uncheckAllBtn = document.getElementById('uncheck-all');
+        const clearCompletedBtn = document.getElementById('clear-completed');
+
+        // Load tasks from local storage, or start with an empty array
+        let todos = JSON.parse(localStorage.getItem('dailyWikiTodos')) || [];
+
+        // Save current tasks to local storage
+        function saveTodos() {
+            localStorage.setItem('dailyWikiTodos', JSON.stringify(todos));
+        }
+
+        // Render the list to the screen
+        function renderTodos() {
+            list.innerHTML = ''; // Clear the list before re-rendering
+            
+            todos.forEach((todo, index) => {
+                const li = document.createElement('li');
+                if (todo.completed) li.classList.add('completed');
+
+                li.innerHTML = `
+                    <div class="task-content" onclick="toggleTodo(${index})">
+                        <input type="checkbox" ${todo.completed ? 'checked' : ''} onclick="event.stopPropagation(); toggleTodo(${index})">
+                        <span class="task-text">${todo.text}</span>
+                    </div>
+                    <button class="delete-btn" onclick="deleteTodo(${index})" title="Delete Task">✕</button>
+                `;
+                list.appendChild(li);
+            });
+        }
+
+        // Add a new task
+        form.addEventListener('submit', (e) => {
+            e.preventDefault(); // Prevent page reload
+            const text = input.value.trim();
+            if (text) {
+                todos.push({ text: text, completed: false });
+                input.value = '';
+                saveTodos();
+                renderTodos();
+            }
+        });
+
+        // Toggle a task as complete/incomplete
+        window.toggleTodo = (index) => {
+            todos[index].completed = !todos[index].completed;
+            saveTodos();
+            renderTodos();
+        };
+
+        // Delete a specific task
+        window.deleteTodo = (index) => {
+            todos.splice(index, 1);
+            saveTodos();
+            renderTodos();
+        };
+
+        // Uncheck all tasks (great for daily recurring habits)
+        uncheckAllBtn.addEventListener('click', () => {
+            todos.forEach(todo => todo.completed = false);
+            saveTodos();
+            renderTodos();
+        });
+
+        // Delete all completed tasks
+        clearCompletedBtn.addEventListener('click', () => {
+            todos = todos.filter(todo => !todo.completed);
+            saveTodos();
+            renderTodos();
+        });
+
+        // Initial render when the page loads
+        renderTodos();
+    </script>
+
+</body>
+</html>
