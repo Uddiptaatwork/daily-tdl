@@ -216,3 +216,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Daily planner runtime data and local email configuration
+/data/
+.env.*
+!.env.example
