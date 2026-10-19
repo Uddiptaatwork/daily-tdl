@@ -23,7 +23,6 @@ class Element {
   focus() { this.focused = true; }
   showModal() { this.open = true; }
   close() { this.open = false; }
-  checkValidity() { return /.+@.+\..+/.test(this.value); }
   get classList() {
     return {
       contains: name => this.className.split(' ').includes(name),
@@ -38,7 +37,9 @@ class Element {
   }
 }
 
-function boot(entries = {}) {
+function boot(entries = {}, protocol = 'file:') {
+  const requests = [];
+  const intervals = [];
   const data = new Map(Object.entries(entries));
   const ids = new Map();
   const all = [];
@@ -63,10 +64,10 @@ function boot(entries = {}) {
     querySelectorAll: selector => all.filter(el => selector === '[data-close]' ? Boolean(el.dataset.close) : selector.split(',').some(s => el.classList.contains(s.trim().slice(1)))),
   };
   const window = { DailyModel: M, addEventListener() {} };
-  const localStorage = { getItem: key => data.get(key) ?? null, setItem: (key, value) => data.set(key, value) };
-  const context = { window, document, localStorage, crypto: webcrypto, Intl, Date, console, location: { protocol: 'file:' }, setTimeout: () => 1, clearTimeout() {}, setInterval() {} };
+  const localStorage = { getItem: key => data.get(key) ?? null, setItem: (key, value) => data.set(key, value), removeItem: key => data.delete(key) };
+  const context = { window, document, localStorage, crypto: webcrypto, Intl, Date, console, location: { protocol }, fetch: (...args) => { requests.push(args); return Promise.reject(new Error('Unexpected network request')); }, setTimeout: () => 1, clearTimeout() {}, setInterval: callback => intervals.push(callback) };
   vm.runInNewContext(fs.readFileSync(require.resolve('../app.js'), 'utf8'), context);
-  return { get, data, saved: () => JSON.parse(data.get('dailyPlannerV1')), titles: () => get('task-groups').querySelectorAll('.task-title').map(el => el.textContent) };
+  return { get, data, requests, tick: () => intervals.forEach(callback => callback()), saved: () => JSON.parse(data.get('dailyPlannerV1')), titles: () => get('task-groups').querySelectorAll('.task-title').map(el => el.textContent) };
 }
 
 async function quickAdd(app, title, priority) {
@@ -99,15 +100,14 @@ test('quick add sorts priorities, completion moves down, delete can be undone', 
   assert.deepEqual(app.titles(), ['Low task', 'High task']);
 });
 
-test('clearing completed tasks retains email history and undo restores the list', async () => {
+test('clearing completed tasks removes saved records and undo restores the list', async () => {
   const app = boot({ dailyWikiTodos: JSON.stringify([{ text: 'Done', completed: true }]) });
   await app.get('clear-completed').click();
   assert.deepEqual(app.titles(), []);
-  assert.equal(app.saved().tasks[0].archived, true);
-  assert.ok(app.saved().tasks[0].completedAt);
+  assert.equal(app.saved().tasks.length, 0);
   await app.get('undo-button').click();
   assert.deepEqual(app.titles(), ['Done']);
-  assert.equal(app.saved().tasks[0].archived, false);
+  assert.ok(app.saved().tasks[0].completedAt);
 });
 
 test('task editor chooses dates and bulk actions affect only that day', async () => {
@@ -126,15 +126,29 @@ test('task editor chooses dates and bulk actions affect only that day', async ()
   await app.get('uncheck-all').click();
   assert.ok(app.saved().tasks.find(t => t.title === 'Today done').completedAt);
   assert.equal(app.saved().tasks.find(t => t.title === 'Tomorrow task').completedAt, null);
-  assert.deepEqual(app.saved().days[tomorrow], { created: true, opened: true });
+  assert.equal(app.saved().tasks.find(t => t.title === 'Tomorrow task').date, tomorrow);
 });
 
-test('email status is explicit and reminders cannot be enabled on a static page', async () => {
-  const app = boot();
-  assert.equal(app.get('reminder-note-title').textContent, 'Email reminders off');
-  await app.get('setup-reminders').click();
-  assert.equal(app.get('reminder-dialog').open, true);
-  assert.equal(app.get('reminder-enabled').disabled, true);
-  assert.match(app.get('service-status').textContent, /optional Python server/);
-  assert.equal(app.saved().settings.enabled, false);
+test('removing the retired feature preserves visible tasks and strips personal preferences', () => {
+  const initial = boot({ dailyWikiTodos: JSON.stringify([{ text: 'Keep me', completed: false }]) }).saved();
+  const old = { ...initial, days: { '2026-10-19': { opened: true, created: true } }, settings: { enabled: true, email: 'private@example.com', timezone: 'Europe/Zurich' } };
+  old.tasks.push({ ...old.tasks[0], id: 'cleared-history', title: 'Already cleared', archived: true });
+  const app = boot({ dailyPlannerV1: JSON.stringify(old), dailyPlannerWorkspace: 'old-workspace-token' });
+  assert.deepEqual(app.titles(), ['Keep me']);
+  assert.deepEqual(Object.keys(app.saved()).sort(), ['tasks', 'version']);
+  assert.equal(app.data.has('dailyPlannerWorkspace'), false);
+  assert.equal(JSON.stringify(app.saved()).includes('private@example.com'), false);
+  assert.equal(app.get('reminder-button'), undefined);
+  assert.equal(app.get('reminder-dialog'), undefined);
+});
+
+test('hosted usage and task changes never make API requests', async () => {
+  const app = boot({}, 'https:');
+  await quickAdd(app, 'Only in my browser', 'high');
+  await app.get('calendar-view').click();
+  await app.get('list-view').click();
+  app.tick();
+  assert.deepEqual(app.requests, []);
+  assert.equal(app.saved().tasks[0].title, 'Only in my browser');
+  assert.deepEqual(boot(Object.fromEntries(app.data), 'https:').titles(), ['Only in my browser']);
 });

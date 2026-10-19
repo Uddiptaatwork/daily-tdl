@@ -1,10 +1,9 @@
-/* Plain browser JavaScript. The optional server only stores snapshots for email. */
+/* Plain browser JavaScript. Tasks stay in this browser; no network requests. */
 (() => {
   'use strict';
   const M = window.DailyModel;
   const $ = id => document.getElementById(id);
   const STORAGE_KEY = 'dailyPlannerV1';
-  const WORKSPACE_KEY = 'dailyPlannerWorkspace';
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
   const uid = () => typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, '0')).join('');
   let storageOK = true;
@@ -13,33 +12,34 @@
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
-      state = JSON.parse(saved);
-      if (state.version !== 1 || !Array.isArray(state.tasks) || !state.days || !state.settings) throw new Error('Invalid saved data');
+      state = restoreState(JSON.parse(saved));
     } else {
       const legacy = JSON.parse(localStorage.getItem('dailyWikiTodos') || '[]');
-      state = M.migrateLegacy(legacy, M.dateKey(new Date(), timezone), timezone, uid, new Date().toISOString());
+      state = M.migrateLegacy(legacy, M.dateKey(new Date(), timezone), uid, new Date().toISOString());
     }
   } catch {
-    state = M.newState(timezone);
+    state = M.newState();
     storageOK = false;
     initialWarning = 'Saved data could not be read. Existing storage has been left untouched. Reload after checking browser storage.';
   }
-  let workspaceId;
-  try {
-    workspaceId = localStorage.getItem(WORKSPACE_KEY) || uid();
-    localStorage.setItem(WORKSPACE_KEY, workspaceId);
-  } catch { storageOK = false; }
+  // Remove the obsolete local identifier used by the retired sync feature.
+  try { localStorage.removeItem('dailyPlannerWorkspace'); } catch { /* Storage may be blocked. */ }
   let selected = today();
   let month = selected.slice(0, 7);
   let view = 'list';
   let editingId = null;
-  let apiAvailable = false;
-  let emailConfigured = false;
-  let syncTimer, toastTimer, undoAction;
-  let syncChain = Promise.resolve();
+  let toastTimer, undoAction;
   let lastDay = today();
 
-  function today() { return M.dateKey(new Date(), state.settings.timezone); }
+  function today() { return M.dateKey(new Date(), timezone); }
+  function restoreState(saved) {
+    if (saved.version !== 1 || !Array.isArray(saved.tasks)) throw new Error('Invalid saved data');
+    // Keep visible tasks while discarding obsolete preferences and activity history.
+    return { version: 1, tasks: saved.tasks.filter(task => !task.archived).map(task => ({
+      id: task.id, title: task.title, date: task.date, priority: task.priority,
+      time: task.time, createdAt: task.createdAt, completedAt: task.completedAt,
+    })) };
+  }
   function make(tag, className, text) {
     const element = document.createElement(tag);
     if (className) element.className = className;
@@ -60,53 +60,22 @@
       catch { storageOK = false; notify('Browser storage is full or unavailable. Changes may not survive a reload.'); }
     }
     if (!storageOK) $('storage-note').textContent = 'Browser storage unavailable. Keep this page open.';
-    clearTimeout(syncTimer);
-    if (apiAvailable) syncTimer = setTimeout(() => syncState(), 300);
-  }
-  function markOpened(date) {
-    state.days[date] = { ...state.days[date], opened: true };
-    persist();
-  }
-  async function request(path, options = {}) {
-    const response = await fetch(path, { ...options, headers: { 'Content-Type': 'application/json', 'X-Workspace-Id': workspaceId, ...options.headers } });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || 'Unable to save to the reminder server.');
-    return data;
-  }
-  function syncState(snapshot = state) {
-    if (!storageOK) return Promise.reject(new Error('Browser storage is unavailable; the server copy has been left untouched.'));
-    const body = JSON.stringify(snapshot);
-    const job = syncChain.catch(() => {}).then(async () => {
-      try {
-        await request('/api/state', { method: 'PUT', body });
-        $('connection-status').textContent = state.settings.enabled && emailConfigured ? 'Reminders on · saved' : 'Saved locally & to server';
-        $('storage-note').textContent = 'Saved in this browser and on your server.';
-      } catch (error) {
-        $('connection-status').textContent = 'Email sync paused · retrying';
-        $('storage-note').textContent = 'Saved in this browser. Email sync needs the server.';
-        throw error;
-      }
-    });
-    syncChain = job;
-    job.catch(() => {});
-    return job;
   }
   function chooseDate(date, openList = true) {
     selected = date;
     month = date.slice(0, 7);
     if (openList) view = 'list';
-    markOpened(date);
     render();
   }
   function monthLabel() { return M.formatDate(`${month}-01`, { month: 'long', year: 'numeric' }); }
-  function dayTasks(date) { return state.tasks.filter(task => task.date === date && !task.archived); }
+  function dayTasks(date) { return state.tasks.filter(task => task.date === date); }
   function renderCalendars() {
     $('mini-month').textContent = monthLabel();
     $('full-month-label').textContent = M.formatDate(`${month}-01`, { month: 'short', year: 'numeric' });
     $('mini-calendar').replaceChildren();
     $('month-grid').replaceChildren();
     const taskMap = new Map();
-    state.tasks.filter(t => !t.archived).forEach(t => taskMap.set(t.date, [...(taskMap.get(t.date) || []), t]));
+    state.tasks.forEach(t => taskMap.set(t.date, [...(taskMap.get(t.date) || []), t]));
     M.calendarDays(month).forEach(date => {
       const tasks = M.sortTasks(taskMap.get(date) || []);
       const classes = [date.slice(0, 7) !== month ? 'outside' : '', date === today() ? 'today' : '', date === selected ? 'selected' : ''].join(' ');
@@ -150,10 +119,6 @@
       $(`${name}-view`).classList.toggle('active', view === name);
       $(`${name}-view`).setAttribute('aria-pressed', String(view === name));
     });
-    $('email-dot').hidden = !(state.settings.enabled && apiAvailable && emailConfigured);
-    const remindersReady = state.settings.enabled && apiAvailable && emailConfigured;
-    $('reminder-note-title').textContent = remindersReady ? 'Email reminders on' : state.settings.enabled ? 'Email reminders need the server' : 'Email reminders off';
-    $('setup-reminders').textContent = state.settings.enabled ? 'Manage reminders →' : 'Set up email →';
     renderCalendars();
     const groups = $('task-groups');
     groups.replaceChildren();
@@ -197,9 +162,7 @@
       remove.setAttribute('aria-label', `Delete ${task.title}`);
       remove.addEventListener('click', () => {
         const snapshot = { ...task };
-        // Keep completed history for the 5 p.m. email, even after clearing the list.
-        if (task.completedAt) task.archived = true;
-        else state.tasks = state.tasks.filter(t => t.id !== task.id);
+        state.tasks = state.tasks.filter(t => t.id !== task.id);
         persist(); render();
         notify('Task removed', () => {
           state.tasks = state.tasks.filter(t => t.id !== snapshot.id);
@@ -213,8 +176,7 @@
     section.append(ul); container.append(section);
   }
   function addTask(title, date, priority, time = '') {
-    state.tasks.push({ id: uid(), title, date, priority, time, createdAt: new Date().toISOString(), completedAt: null, archived: false });
-    state.days[date] = { ...state.days[date], created: true };
+    state.tasks.push({ id: uid(), title, date, priority, time, createdAt: new Date().toISOString(), completedAt: null });
   }
   function openTask(task) {
     editingId = task?.id || null;
@@ -225,11 +187,6 @@
     $('task-time').value = task?.time || '';
     $('task-dialog').showModal();
     $('task-title').focus();
-  }
-  function updateServiceStatus() {
-    $('service-status').classList.toggle('ready', apiAvailable && emailConfigured);
-    $('service-status').textContent = !apiAvailable ? 'Email needs the optional Python server running. Your task list works without it. See README.md for setup.' : !emailConfigured ? 'The server is running. Configure SMTP in its environment to enable scheduled emails. See README.md for setup.' : 'Email is ready. Keep the server running for scheduled delivery, even when this page is closed.';
-    $('reminder-enabled').disabled = !state.settings.enabled && (!apiAvailable || !emailConfigured || !storageOK);
   }
   $('quick-add').addEventListener('submit', event => {
     event.preventDefault();
@@ -248,9 +205,9 @@
     if (!title || !M.validDate(date)) return;
     const task = state.tasks.find(t => t.id === editingId);
     if (task) {
-      if (task.date !== date) state.days[date] = { ...state.days[date], created: true };
       Object.assign(task, { title, date, priority: $('task-priority').value, time: $('task-time').value });
     } else addTask(title, date, $('task-priority').value, $('task-time').value);
+    persist();
     chooseDate(date);
     $('task-dialog').close();
     notify(task ? 'Task updated' : 'Task added');
@@ -275,66 +232,22 @@
     notify('Tasks unchecked for this day', () => { changed.forEach(old => { const task = state.tasks.find(t => t.id === old.id); if (task) task.completedAt = old.completedAt; }); persist(); render(); });
   });
   $('clear-completed').addEventListener('click', () => {
-    const ids = dayTasks(selected).filter(t => t.completedAt).map(t => t.id);
-    state.tasks.forEach(t => { if (ids.includes(t.id)) t.archived = true; });
+    const removed = dayTasks(selected).filter(t => t.completedAt);
+    state.tasks = state.tasks.filter(t => !removed.includes(t));
     persist(); render();
-    notify('Completed tasks cleared. Kept in your email summary.', () => { state.tasks.forEach(t => { if (ids.includes(t.id)) t.archived = false; }); persist(); render(); });
+    notify('Completed tasks cleared', () => { state.tasks.push(...removed); persist(); render(); });
   });
   $('undo-button').addEventListener('click', () => { undoAction?.(); undoAction = null; $('toast').hidden = true; });
-  $('reminder-button').addEventListener('click', () => {
-    $('reminder-enabled').checked = state.settings.enabled;
-    $('reminder-email').value = state.settings.email;
-    $('reminder-timezone').value = state.settings.timezone;
-    $('reminder-error').textContent = '';
-    updateServiceStatus();
-    $('reminder-dialog').showModal();
-  });
-  $('setup-reminders').addEventListener('click', () => $('reminder-button').click());
-  $('reminder-form').addEventListener('submit', async event => {
-    event.preventDefault();
-    const enabled = $('reminder-enabled').checked;
-    const email = $('reminder-email').value.trim();
-    const zone = $('reminder-timezone').value.trim();
-    $('reminder-error').textContent = '';
-    try {
-      new Intl.DateTimeFormat('en', { timeZone: zone }).format();
-      if (enabled && (!email || !$('reminder-email').checkValidity())) throw new Error('Enter a valid email address to enable reminders.');
-      if (enabled && (!apiAvailable || !emailConfigured || !storageOK)) throw new Error('Email is not available. Start and configure the server first.');
-      $('save-reminders').disabled = true;
-      const next = { ...state, settings: { enabled, email, timezone: zone } };
-      clearTimeout(syncTimer);
-      // The opt-in is only saved locally after the server accepts it.
-      if (apiAvailable) await syncState(next);
-      state.settings = next.settings;
-      lastDay = today();
-      persist(); render();
-      $('reminder-dialog').close();
-      notify(enabled ? 'Reminders on: 5 p.m. and 9 a.m. tomorrow.' : 'Email reminders are off. Preferences saved.');
-    } catch (error) {
-      $('reminder-error').textContent = error instanceof RangeError ? 'Use a timezone such as Europe/Zurich or America/New_York.' : error.message;
-    } finally { $('save-reminders').disabled = false; }
-  });
   window.addEventListener('storage', event => {
     if (event.key !== STORAGE_KEY || !event.newValue) return;
-    try { const next = JSON.parse(event.newValue); if (next.version === 1 && Array.isArray(next.tasks) && next.days && next.settings) { state = next; markOpened(selected); render(); } } catch { /* Keep the current state if another tab writes invalid data. */ }
+    try { state = restoreState(JSON.parse(event.newValue)); render(); } catch { /* Keep the current state if another tab writes invalid data. */ }
   });
-  async function connect() {
-    if (!['http:', 'https:'].includes(location.protocol) || !workspaceId) return;
-    try {
-      const status = await request('/api/status');
-      apiAvailable = status.service === 'daily-planner';
-      emailConfigured = Boolean(status.emailConfigured);
-      if (apiAvailable) { updateServiceStatus(); if (storageOK) await syncState(); render(); }
-    } catch { /* Static hosting remains a fully functional browser-only task list. */ }
-  }
-  markOpened(selected);
+  persist();
   render();
   if (initialWarning) notify(initialWarning);
-  connect();
-  // Retry saved snapshots and reconnect if the optional server starts later.
+  // Move to the new day at midnight when the current day is selected.
   setInterval(() => {
     const currentDay = today();
     if (currentDay !== lastDay) { if (selected === lastDay) chooseDate(currentDay); lastDay = currentDay; }
-    if (apiAvailable) syncState().catch(() => {}); else connect();
   }, 30000);
 })();

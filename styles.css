@@ -18,7 +18,6 @@ button[hidden],[hidden]{display:none!important}
 .brand-mark{display:grid;place-items:center;font-size:22px;color:white;background:var(--purple);width:34px;height:34px;border-radius:11px;margin-right:10px;letter-spacing:0}
 .brand-dot{color:var(--purple)}
 .header-note{color:var(--muted);font-size:13px}
-.app-header>.button{margin-left:auto}
 .button{border:1px solid var(--line);border-radius:8px;background:white;padding:10px 15px;color:var(--ink);display:inline-flex;justify-content:center;align-items:center;gap:8px;font-weight:500;white-space:nowrap}
 .button:hover{background:#f8f7fc}
 .button.primary{background:var(--purple);color:white;border-color:var(--purple);box-shadow:0 3px 6px #7160c516}
@@ -26,7 +25,6 @@ button[hidden],[hidden]{display:none!important}
 .button.quiet{background:transparent}
 .button.quiet:hover{background:#eeece8}
 .button.small{font-size:12px;padding:7px 13px}
-.status-dot{width:6px;height:6px;border-radius:50%;background:var(--green)}
 .planner{display:grid;grid-template-columns:275px minmax(0,1fr);background:white;border:1px solid #e6e4df;border-radius:15px;min-height:650px;box-shadow:0 10px 35px #29262004;overflow:hidden}
 .sidebar{padding:29px 24px;background:#fcfbf9;border-right:1px solid var(--line)}
 .sidebar-heading,.month-nav{display:flex;align-items:center;justify-content:space-between}
@@ -59,10 +57,6 @@ progress::-webkit-progress-bar{background:#eae7f3;border-radius:10px}
 progress::-webkit-progress-value{background:var(--purple);border-radius:10px}
 progress::-moz-progress-bar{background:var(--purple);border-radius:10px}
 .progress-card p{color:var(--muted);font-size:11px;line-height:1.6;margin-top:11px}
-.reminder-note{display:flex;align-items:flex-start;gap:10px;margin-top:30px;padding:15px 12px;background:#f2f0f8;border-radius:9px}
-.reminder-note>span{color:var(--purple);font-size:20px}
-.reminder-note p{font-size:10px;line-height:1.8;color:#868092}
-.reminder-note strong{display:block;font-weight:500;font-size:11px;color:#68617e;margin-bottom:3px}
 .storage-note{font-size:10px;line-height:1.6;color:#99999e;margin-top:22px}
 .workspace{padding:36px 34px 24px;min-width:0}
 .day-heading{display:flex;align-items:center;justify-content:space-between;gap:16px}
@@ -143,18 +137,6 @@ dialog input,dialog select{width:100%;min-width:0;border:1px solid #e1dfe6;backg
 .form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .optional{color:var(--muted);font-size:10px}
 .dialog-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:26px}
-.dialog-intro{color:var(--muted);font-size:12px;line-height:1.8}
-.schedule-preview{border-radius:9px;background:#f7f5fb;margin:18px 0;padding:15px}
-.schedule-preview>div{display:flex;align-items:center;gap:14px}
-.schedule-preview>div+div{margin-top:16px}
-.schedule-preview>div>span{font-size:13px;color:var(--purple);font-variant-numeric:tabular-nums}
-.schedule-preview p{font-size:11px;color:var(--muted);line-height:1.7}
-.schedule-preview strong{display:block;font-weight:500;color:#635c75}
-.service-status{font-size:11px;line-height:1.7;background:#f8f6ef;color:#958153;border-radius:7px;padding:11px}
-.service-status.ready{color:#588771;background:#eef6f0}
-.toggle-label{flex-direction:row;align-items:center;line-height:1.7}
-.toggle-label input{width:16px;height:16px;accent-color:var(--purple)}
-.form-error{font-size:11px;color:var(--red);line-height:1.6;margin-top:12px}
 .toast{position:fixed;bottom:25px;left:50%;transform:translateX(-50%);display:flex;gap:20px;align-items:center;padding:13px 20px;max-width:calc(100% - 32px);background:#34303f;color:#fff;border-radius:9px;font-size:12px;box-shadow:0 5px 20px #27213522;z-index:10}
 .toast button{background:transparent;color:#d3c5ff;border:0;font-size:12px;padding:3px}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
@@ -175,7 +157,6 @@ dialog input,dialog select{width:100%;min-width:0;border:1px solid #e1dfe6;backg
 .app-header{height:82px;gap:15px}
 .brand{font-size:26px}
 .brand-mark{width:30px;height:30px;font-size:20px}
-.app-header>.button{font-size:11px;padding:8px 10px}
 .planner{display:flex;flex-direction:column;border-radius:12px;min-height:0}
 .sidebar{display:none}
 .workspace{padding:25px 18px}

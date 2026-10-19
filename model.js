@@ -36,17 +36,16 @@
       return a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id);
     });
   }
-  function newState(timezone) {
-    return { version: 1, tasks: [], days: {}, settings: { enabled: false, email: '', timezone } };
+  function newState() {
+    return { version: 1, tasks: [] };
   }
-  function migrateLegacy(todos, today, timezone, idFactory, now) {
-    const state = newState(timezone);
+  function migrateLegacy(todos, today, idFactory, now) {
+    const state = newState();
     if (!Array.isArray(todos)) return state;
     state.tasks = todos.filter(t => t && typeof t.text === 'string' && t.text.trim()).map(t => ({
       id: idFactory(), title: t.text.trim().slice(0, 300), date: today, priority: 'medium', time: '',
-      createdAt: now, completedAt: t.completed ? now : null, archived: false,
+      createdAt: now, completedAt: t.completed ? now : null,
     }));
-    if (state.tasks.length) state.days[today] = { opened: true, created: true };
     return state;
   }
   const api = { PRIORITY, dateKey, validDate, addDays, formatDate, calendarDays, sortTasks, newState, migrateLegacy };

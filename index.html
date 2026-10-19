@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f6f5f2">
-  <meta name="description" content="A little space to plan your day. A lightweight task list with a calendar, priorities, and optional email summaries.">
+  <meta name="description" content="A little space to plan your day. A lightweight, private task list with a calendar and priorities. Your tasks stay in your browser.">
   <title>Daily — a little space for your day</title>
   <link rel="stylesheet" href="styles.css">
   <script defer src="model.js"></script>
@@ -15,7 +15,6 @@
     <header class="app-header">
       <a class="brand" href="./" aria-label="Daily home"><span class="brand-mark" aria-hidden="true">✓</span>daily<span class="brand-dot">.</span></a>
       <span class="header-note">A little space for your day.</span>
-      <button class="button quiet" id="reminder-button"><span aria-hidden="true">✉</span> Email reminders<span class="status-dot" id="email-dot" hidden></span></button>
     </header>
 
     <main class="planner">
@@ -34,7 +33,6 @@
           <progress id="day-progress" max="1" value="0" aria-label="Tasks completed for selected day"></progress>
           <p id="progress-message">Make a little room for what matters.</p>
         </div>
-        <div class="reminder-note"><span aria-hidden="true">☀</span><div><p><strong id="reminder-note-title">Email reminders off</strong>5 p.m. completed-task recap.<br>9 a.m. unfinished-task follow-up.</p><button class="text-button" id="setup-reminders">Set up email →</button></div></div>
         <p class="storage-note" id="storage-note">Saved in this browser, as you go.</p>
       </aside>
 
@@ -62,7 +60,7 @@
         <div id="calendar-panel" hidden><div class="weekdays full-weekdays" aria-hidden="true"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div><div id="month-grid" class="month-grid" aria-label="Monthly tasks"></div><p class="month-help">Choose a day to see its tasks.</p></div>
       </section>
     </main>
-    <footer class="app-footer"><span>Less noise. More getting things done.</span><span id="connection-status">Local & personal</span></footer>
+    <footer class="app-footer"><span>Less noise. More getting things done.</span><span id="privacy-note">Your tasks stay in this browser</span></footer>
   </div>
 
   <dialog id="task-dialog" aria-labelledby="task-dialog-title">
@@ -75,19 +73,6 @@
     </form>
   </dialog>
 
-  <dialog id="reminder-dialog" aria-labelledby="reminder-title">
-    <form id="reminder-form">
-      <div class="dialog-heading"><h2 id="reminder-title">A gentle daily nudge</h2><button class="icon-button" type="button" data-close="reminder-dialog" aria-label="Close">×</button></div>
-      <p class="dialog-intro">A small update in your inbox, only for calendar days you opened and added tasks to.</p>
-      <div class="schedule-preview"><div><span>17:00</span><p><strong>A look at what you did</strong>Tasks completed that day.</p></div><div><span>09:00</span><p><strong>A head start tomorrow</strong>Yesterday’s tasks still left to do.</p></div></div>
-      <p class="service-status" id="service-status"></p>
-      <label class="toggle-label"><input id="reminder-enabled" type="checkbox"> Send me these email reminders</label>
-      <label>Email address<input id="reminder-email" type="email" maxlength="254" placeholder="you@example.com" autocomplete="email"></label>
-      <label>Timezone<input id="reminder-timezone" type="text" required list="timezone-options" placeholder="Europe/Zurich"><datalist id="timezone-options"><option value="Europe/Zurich"><option value="Europe/London"><option value="America/New_York"><option value="America/Los_Angeles"><option value="Asia/Kolkata"><option value="Asia/Tokyo"><option value="Australia/Sydney"><option value="UTC"></datalist></label>
-      <p id="reminder-error" class="form-error" role="alert"></p>
-      <div class="dialog-actions"><button class="button quiet" type="button" data-close="reminder-dialog">Cancel</button><button class="button primary" id="save-reminders" type="submit">Save preferences</button></div>
-    </form>
-  </dialog>
   <div class="toast" id="toast" role="status" hidden><span id="toast-message"></span><button id="undo-button" hidden>Undo</button></div>
   <p class="sr-only" id="live-status" role="status"></p>
 </body>

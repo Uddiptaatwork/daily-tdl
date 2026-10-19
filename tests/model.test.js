@@ -32,11 +32,10 @@ test('priority sorting keeps completed tasks last, then uses time and added orde
 
 test('legacy tasks keep text and completion and migrate once into the current date', () => {
   let id = 0;
-  const state = M.migrateLegacy([{ text: '<b>Real text</b>', completed: true }, { text: 'Next', completed: false }, { text: '' }, null], '2026-10-19', 'Europe/Zurich', () => String(++id), '2026-10-19T10:00:00Z');
+  const state = M.migrateLegacy([{ text: '<b>Real text</b>', completed: true }, { text: 'Next', completed: false }, { text: '' }, null], '2026-10-19', () => String(++id), '2026-10-19T10:00:00Z');
   assert.equal(state.tasks.length, 2);
   assert.equal(state.tasks[0].title, '<b>Real text</b>');
   assert.equal(state.tasks[0].completedAt, '2026-10-19T10:00:00Z');
   assert.equal(state.tasks[1].completedAt, null);
-  assert.deepEqual(state.days['2026-10-19'], { opened: true, created: true });
-  assert.equal(state.settings.enabled, false);
+  assert.deepEqual(Object.keys(state).sort(), ['tasks', 'version']);
 });
